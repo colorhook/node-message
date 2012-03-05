@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>node-message chat demo</title>
+<link  href="http://k.kbcdn.com/min/f=/k2/css/reset-1-0-0.css,/k2/css/color-1-0-2.css,/k2/css/common-1-0-1.css,/k2/css/grids-1-0-0.css" type="text/css" rel="stylesheet">
+
+<style>
+.hidden{display:none;}
+
+#login-panel{
+	font-size: 14px;
+	padding-top:200px;
+}
+</style>
+</head>
+<body>
+<div class="k2-single k2-w48">
+	<div id="login-panel">
+		<label>请输出昵称：</label>
+		<input id="nickname"/>
+		<button id="enterBtn">enter</button>
+	</div>
+	<div id="chat-panel" class="hidden">
+		<div id="list"></div>
+		<div id="chat"></div>
+		<input id="say"/>
+		<button id="sendBtn">send</button>
+	</div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/lib/MessageAgent.js"></script>
+<script src="/lib/jquery-1.7.1.min.js"></script>
+<script src="/lib/mustache.js"></script>
+<script>
+var messageAgent = new MessageAgent("http://localhost:10080/");
+//绑定服务器事件
+messageAgent.on("connect", function(event, session, msg){
+	if(!session){
+		alert("该昵称有人正在使用，请换一个");
+		return;
+	}
+	$("#login-panel").hide();
+	$("#chat-panel").show();
+	messageAgent.list();
+});
+messageAgent.on("list", function(event, list){
+	var tpl = '{{#items}}<li data-sessionId="{{{sessionId}}}">{{{nickname}}}</li>{{/items}}';
+	$("#list").html(Mustache.to_html(tpl, {items: list}));
+});
+messageAgent.on("join", function(event, remoteClient){
+	var tpl = '<div><em data-sessionId="{{{sessionId}}}">{{{nickname}}}</em>加入了聊天室</div>';
+	$("#chat").append(Mustache.to_html(tpl, remoteClient));
+	tpl = '<li data-sessionId="{{{sessionId}}}">{{{nickname}}}</li>';
+	$("#list").append(Mustache.to_html(tpl, remoteClient));
+});
+messageAgent.on("part", function(event, remoteClient){
+	var tpl = '<div><em>{{{nickname}}}</em>退出了聊天室</div>';
+	$("#chat").append(Mustache.to_html(tpl, remoteClient));
+	$("#list li[data-sessionId="+remoteClient.sessionId+"]").remove();
+});
+messageAgent.on("message", function(event, message, remoteClient){
+	var tpl = '<div><em>{{{nickname}}}</em>说：<span>{{{message}}}</span></div>';
+	$("#chat").append(Mustache.to_html(tpl, {nickname: remoteClient.nickname, message: message}));
+});
+//绑定客户端用户点击事件
+$("#enterBtn").click(function(){
+	messageAgent.connect({
+		nickname: $("#nickname").val()
+	});
+});
+$("#sendBtn").click(function(){
+	var message = $("#say").val();
+	messageAgent.sendMessage(message);
+	var tpl = '<div class="message-me message"><em>{{{nickname}}}</em>说：<span>{{{message}}}</span></div>';
+	$("#chat").append(Mustache.to_html(tpl, {nickname: messageAgent.session.nickname, message: message}));
+});
+</script>
+</body>
+</html>
